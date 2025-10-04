@@ -1,4 +1,4 @@
-# Carbon Black Cloud Query Builder MCP Server - Dependencies
+# Cortex Query Builder MCP Server - Dependencies
 
 fastmcp>=2.0.0,<3.0.0
 pydantic>=2.7.0,<3.0.0
