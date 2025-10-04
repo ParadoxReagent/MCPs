@@ -7,9 +7,19 @@ from typing import Any, Dict, List, Optional
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .schema_loader import CBCSchemaCache, normalise_search_type
-from .query_builder import build_cbc_query, QueryBuildError, DEFAULT_BOOLEAN_OPERATOR, MAX_LIMIT
-from .rag import RAGService
+if __package__ is None or __package__ == "":  # pragma: no cover - direct script execution
+    import sys
+
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from cbc_builder.schema_loader import CBCSchemaCache, normalise_search_type
+from cbc_builder.query_builder import (
+    build_cbc_query,
+    QueryBuildError,
+    DEFAULT_BOOLEAN_OPERATOR,
+    MAX_LIMIT,
+)
+from cbc_builder.rag import RAGService
 
 
 logging.basicConfig(
