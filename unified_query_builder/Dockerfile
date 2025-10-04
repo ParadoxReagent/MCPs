@@ -29,12 +29,14 @@ import fastmcp, pydantic
 print("Deps OK. FastMCP:", getattr(fastmcp, "__version__", "unknown"))
 PY
 
+RUN mkdir -p ${APP_HOME}/unified_query_builder
+
 COPY server.py cbc_query_builder.py kql_query_builder.py rag.py \
      cbc_schema_loader.py kql_schema_loader.py __init__.py \
-     requirements.txt cb_edr_schema.json entrypoint.sh ./
-COPY defender_xdr_kql_schema_fuller ./defender_xdr_kql_schema_fuller
+     cb_edr_schema.json entrypoint.sh ./unified_query_builder/
+COPY defender_xdr_kql_schema_fuller ./unified_query_builder/defender_xdr_kql_schema_fuller
 
-RUN chmod +x entrypoint.sh && \
+RUN chmod +x unified_query_builder/entrypoint.sh && \
     chown -R ${APP_UID}:${APP_GID} ${APP_HOME}
 
 USER ${APP_UID}:${APP_GID}
@@ -42,5 +44,5 @@ USER ${APP_UID}:${APP_GID}
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD test -w ${CACHE_DIR} || exit 1
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["./unified_query_builder/entrypoint.sh"]
 CMD ["python", "-m", "unified_query_builder.server"]
