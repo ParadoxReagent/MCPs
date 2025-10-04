@@ -80,8 +80,10 @@ def _sanitise_term(term: str) -> str:
     cleaned = term.strip()
     if not cleaned:
         return ""
-    if any(ch in cleaned for ch in [";", "|", "\\", "(", ")", "{" ,"}"]):
+    if any(ch in cleaned for ch in [";", "|", "(", ")", "{" ,"}"]):
         raise QueryBuildError(f"Unsafe characters detected in term '{term}'")
+    # Escape backslashes for Windows paths and domain-qualified usernames
+    cleaned = cleaned.replace("\\", "\\\\")
     return cleaned
 
 
