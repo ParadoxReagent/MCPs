@@ -1,0 +1,1184 @@
+{
+  "carbonblack_edr_query_schema": {
+    "version": "7.5",
+    "description": "CarbonBlack EDR query syntax and field definitions for building queries programmatically",
+    
+    "operators": {
+      "logical": {
+        "AND": {
+          "syntax": ["and", "AND", "whitespace"],
+          "description": "Boolean AND operator",
+          "examples": ["svchost.exe cmd.exe", "svchost.exe and cmd.exe"]
+        },
+        "OR": {
+          "syntax": ["or", "OR"],
+          "description": "Boolean OR operator",
+          "examples": ["svchost.exe or cmd.exe"]
+        },
+        "NOT": {
+          "syntax": ["-"],
+          "description": "Boolean NOT operator",
+          "examples": ["-svchost.exe", "-alliance_score_srstrust:*"]
+        },
+        "NESTING": {
+          "syntax": ["()"],
+          "description": "Parentheses for nested queries",
+          "examples": ["(svchost.exe or cmd.exe) powershell.exe"]
+        }
+      },
+      "wildcard": {
+        "asterisk": {
+          "symbol": "*",
+          "description": "Matches zero or more characters",
+          "examples": ["process_name:win*.exe"],
+          "warning": "Leading wildcards not recommended - significant performance penalty"
+        }
+      },
+      "field_syntax": {
+        "description": "Limit terms to specific fields",
+        "format": "<field>:<term>",
+        "examples": ["process_name:svchost.exe", "md5:5a18f00ab9330ac7539675f326cf11"]
+      }
+    },
+
+    "special_characters": {
+      "whitespace": {
+        "behavior": "Default delimiter, tokenizes query into multiple terms",
+        "escape": "Use double quotes or backslash (\\)",
+        "examples": {
+          "with_quotes": "path:\"microsoft office\\office15\\powerpnt.exe\"",
+          "with_escape": "path:microsoft\\ office\\office15\\powerpnt.exe"
+        }
+      },
+      "parentheses": {
+        "behavior": "Delimiter for nested queries",
+        "escape": "Use double quotes or backslash (\\)",
+        "examples": {
+          "escaped": "c:\\program\\ files\\ \\(x86\\)\\windows"
+        }
+      },
+      "double_quotes": {
+        "behavior": "Delimiter for phrase queries",
+        "escape": "Use backslash (\\)",
+        "examples": {
+          "escaped": "cmdline:\\\"c:\\program files \\(x86\\)\\google\\update\\googleupdate.exe\\\" /svc"
+        }
+      }
+    },
+
+    "search_types": {
+      "process_search": {
+        "description": "Search for process execution events",
+        "applicable_to": ["processes"]
+      },
+      "binary_search": {
+        "description": "Search for binary/executable files",
+        "applicable_to": ["binaries"]
+      },
+      "alert_search": {
+        "description": "Search for security alerts",
+        "applicable_to": ["alerts"]
+      },
+      "threat_report_search": {
+        "description": "Search for threat intelligence reports",
+        "applicable_to": ["threat_reports"]
+      }
+    },
+
+    "field_types": {
+      "text": {
+        "description": "Tokenized on whitespace and punctuation, case-insensitive",
+        "search_behavior": "Each word searched individually, supports phrase queries",
+        "example": "product_name:\"visual studio\""
+      },
+      "keyword": {
+        "description": "No tokenization, exact match required",
+        "search_behavior": "Must exactly match the field value",
+        "wildcards_supported": true,
+        "example": "process_name:svchost.exe"
+      },
+      "md5": {
+        "description": "MD5 hash value, keyword field",
+        "format": "32-character hexadecimal string",
+        "example": "process_md5:6d7c8a951af6ad6835c029b3cb88d333"
+      },
+      "sha256": {
+        "description": "SHA-256 hash value, keyword field",
+        "format": "64-character hexadecimal string",
+        "example": "process_sha256:BCB8F25FE404CDBFCB0927048F668D7958E590357930CF620F74B59839AF2A9C"
+      },
+      "path": {
+        "description": "Tokenized by path hierarchy",
+        "tokenization": "All subpaths are searchable",
+        "wildcards_supported": true,
+        "example": "path:c:\\windows\\system32\\boot\\winload.exe",
+        "special_cases": {
+          "modload": "Leading slashes tokenized, recommend omitting",
+          "regmod": "Replace controlset001/002 with currentcontrolset, omit leading backslash"
+        }
+      },
+      "domain": {
+        "description": "Split into labels for position-dependent searches",
+        "syntax": {
+          "trailing_dot": "Matches labels at end of domain (.com matches *.com)",
+          "leading_dot": "Matches labels at beginning (example. matches example.*)",
+          "both_dots": "Matches labels in middle (.com. matches *.com.*)",
+          "no_dots": "Matches anywhere in domain"
+        },
+        "example": "domain:example.com"
+      },
+      "ipaddr": {
+        "description": "IPv4 address with CIDR notation support",
+        "format": "(ip)/(netmask)",
+        "default_netmask": 32,
+        "examples": ["ipaddr:192.168.0.0/16", "ipaddr:10.0.1.1"]
+      },
+      "ipv6addr": {
+        "description": "IPv6 address with CIDR notation support",
+        "format": "(ip)/(netmask)",
+        "default_netmask": 32,
+        "examples": ["ipv6addr:fe00:b9:266:2011:28dc:43d4:3298:12e2", "ipv6addr:fe00:b9:266:2011::0/50"]
+      },
+      "count": {
+        "description": "Integer value from 0 to MAXINT",
+        "syntax": {
+          "exact": "X (matches exactly X)",
+          "range": "[X TO Y] (matches >= X and <= Y)",
+          "wildcard": "* can replace X or Y"
+        },
+        "examples": ["modload_count:34", "modload_count:[1 TO 10]", "netconn_count:[10 TO *]"]
+      },
+      "datetime": {
+        "description": "Date and time field with multiple search formats",
+        "formats": [
+          {
+            "format": "YYYY-MM-DD",
+            "description": "Matches all entries on this day",
+            "example": "start:2016-12-01"
+          },
+          {
+            "format": "YYYY-MM-DDThh:mm:ss",
+            "description": "Matches within 24 hours from this timestamp",
+            "example": "start:2016-12-01T22:15:00"
+          },
+          {
+            "format": "[YYYY-MM-DD TO YYYY-MM-DD]",
+            "description": "Matches all entries in date range",
+            "example": "start:[2016-12-01 TO 2016-12-31]"
+          },
+          {
+            "format": "[YYYY-MM-DDThh:mm:ss TO YYYY-MM-DDThh:mm:ss]",
+            "description": "Matches all entries in datetime range",
+            "example": "start:[2016-12-01T22:15:00 TO 2016-12-01T23:14:59]"
+          },
+          {
+            "format": "-Xh",
+            "description": "Relative time calculation (h=hours, m=minutes, s=seconds)",
+            "example": "start:-24h"
+          }
+        ]
+      },
+      "bool": {
+        "description": "Boolean field with true/false values",
+        "values": ["true", "false"],
+        "case_insensitive": true,
+        "example": "is_64bit:true"
+      },
+      "sign": {
+        "description": "Digital signature status",
+        "values": [
+          "Signed",
+          "Unsigned",
+          "Bad Signature",
+          "Invalid Signature",
+          "Expired",
+          "Invalid Chain",
+          "Untrusted Root",
+          "Explicit Distrust"
+        ],
+        "quote_required": "For values with whitespace",
+        "examples": ["digsig_result:Signed", "digsig_result:\"Invalid Chain\""]
+      },
+      "cmdline": {
+        "description": "Command line tokenization with special parsing rules",
+        "tokenization": {
+          "removed_chars": ["\\", "\"", "'", "(", ")", "[", "]", "{", "}", ",", "=", "<", ">", "&", "|", ";"],
+          "preserved_chars": ["%", "$", "-", ".", "_", "^", "@", "#", "!", "?"],
+          "forward_slash": "Parsed as path or command switch depending on position",
+          "colon": "Parsed as drive letter or whitespace depending on position",
+          "file_extensions": "Stored as separate tokens (.exe, .dll)"
+        },
+        "wildcards_supported": true,
+        "example": "cmdline:backup"
+      }
+    },
+
+    "process_search_fields": {
+      "blocked_md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 of a process blocked due to banning rule"
+      },
+      "blocked_status": {
+        "type": "keyword",
+        "description": "Status of block attempt on running process",
+        "values": [
+          "ProcessTerminated",
+          "NotTerminatedCBProcess",
+          "NotTerminatedSystemProcess",
+          "NotTerminatedCriticialSystemProcess",
+          "NotTerminatedWhiltestedPath",
+          "NotTerminatedOpenProcessError",
+          "NotTerminatedTerminateError"
+        ]
+      },
+      "childproc_count": {
+        "type": "count",
+        "description": "Total count of child processes created"
+      },
+      "childproc_md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 of executable backing created child processes"
+      },
+      "childproc_sha256": {
+        "type": "sha256",
+        "default_field": true,
+        "description": "SHA-256 of executable backing created child processes"
+      },
+      "childproc_name": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Filename of child process executables"
+      },
+      "cmdline": {
+        "type": "cmdline",
+        "default_field": true,
+        "description": "Full command line for process"
+      },
+      "crossproc_count": {
+        "type": "count",
+        "description": "Total count of cross process actions by actor process"
+      },
+      "crossproc_md5": {
+        "type": "md5",
+        "description": "MD5 of actor process that performed cross process action"
+      },
+      "crossproc_sha256": {
+        "type": "sha256",
+        "description": "SHA-256 of actor process that performed cross process action"
+      },
+      "crossproc_name": {
+        "type": "keyword",
+        "description": "Name of actor process that performed cross process action"
+      },
+      "crossproc_type": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Type of cross process action",
+        "values": ["processopen", "remotethread", "processopentarget", "remotethreadtarget"]
+      },
+      "domain": {
+        "type": "domain",
+        "default_field": true,
+        "description": "Network connection to this domain"
+      },
+      "filemod": {
+        "type": "path",
+        "default_field": true,
+        "description": "Path of file modified by process"
+      },
+      "filemod_count": {
+        "type": "count",
+        "description": "Total count of file modifications"
+      },
+      "filewrite_md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 of file written by process"
+      },
+      "filewrite_sha256": {
+        "type": "sha256",
+        "default_field": true,
+        "description": "SHA-256 of file written by process"
+      },
+      "group": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Sensor group assigned at time of execution"
+      },
+      "has_emet_config": {
+        "type": "bool",
+        "description": "Indicates whether process has EMET mitigations configured"
+      },
+      "has_emet_event": {
+        "type": "bool",
+        "description": "Indicates whether process has EMET mitigation events"
+      },
+      "host_type": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Type of computer",
+        "values": ["workstation", "server", "domain controller"]
+      },
+      "hostname": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Hostname of computer where process executed"
+      },
+      "ipaddr": {
+        "type": "ipaddr",
+        "description": "Network connection to/from this IP address (remote only)"
+      },
+      "ipv6addr": {
+        "type": "ipv6addr",
+        "description": "Network connection to/from this IPv6 address (remote only)"
+      },
+      "ipport": {
+        "type": "integer",
+        "description": "Network connection to this destination port"
+      },
+      "is_64bit": {
+        "type": "bool",
+        "description": "True if architecture is x64"
+      },
+      "is_executable_image": {
+        "type": "bool",
+        "description": "True if binary is EXE (versus DLL or SYS)"
+      },
+      "ja3": {
+        "type": "keyword",
+        "description": "JA3 fingerprint of client TLS hello packet"
+      },
+      "ja3s": {
+        "type": "keyword",
+        "description": "JA3S fingerprint of server TLS hello packet"
+      },
+      "last_server_update": {
+        "type": "datetime",
+        "description": "Last activity in process in server's local time"
+      },
+      "last_update": {
+        "type": "datetime",
+        "description": "Last activity in process in computer's local time"
+      },
+      "md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 of process, parent, child, loaded module, or written file"
+      },
+      "sha256": {
+        "type": "sha256",
+        "default_field": true,
+        "description": "SHA-256 of process, parent, child, loaded module, or written file"
+      },
+      "modload": {
+        "type": "path",
+        "default_field": true,
+        "description": "Path of module loaded into process"
+      },
+      "modload_count": {
+        "type": "count",
+        "description": "Total count of module loads"
+      },
+      "netconn_count": {
+        "type": "count",
+        "description": "Total count of network connections"
+      },
+      "os_type": {
+        "type": "keyword",
+        "description": "Type of operating system",
+        "values": ["Windows", "OSX", "Linux"]
+      },
+      "parent_id": {
+        "type": "long",
+        "description": "Internal Carbon Black EDR process guid for parent"
+      },
+      "parent_md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 of executable backing parent process"
+      },
+      "parent_sha256": {
+        "type": "sha256",
+        "default_field": true,
+        "description": "SHA-256 of executable backing parent process"
+      },
+      "parent_name": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Filename of parent process executable"
+      },
+      "path": {
+        "type": "path",
+        "default_field": true,
+        "description": "Full path to executable backing process"
+      },
+      "process_id": {
+        "type": "long",
+        "description": "Internal Carbon Black EDR process guid"
+      },
+      "process_md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 of executable backing this process"
+      },
+      "process_sha256": {
+        "type": "sha256",
+        "default_field": true,
+        "description": "SHA-256 of executable backing this process"
+      },
+      "process_name": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Filename of executable backing process"
+      },
+      "regmod": {
+        "type": "path",
+        "default_field": true,
+        "description": "Path of registry key modified by process",
+        "special_handling": "Replace controlset001/002 with currentcontrolset, omit leading backslash"
+      },
+      "regmod_count": {
+        "type": "count",
+        "description": "Total count of registry modifications"
+      },
+      "sensor_id": {
+        "type": "long",
+        "description": "Internal Carbon Black EDR sensor guid"
+      },
+      "start": {
+        "type": "datetime",
+        "description": "Start time of process in computer's local time"
+      },
+      "tampered": {
+        "type": "bool",
+        "description": "True if attempts made to modify sensor binaries/artifacts/config"
+      },
+      "username": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "User context with which process executed"
+      },
+      "watchlist_<id>": {
+        "type": "datetime",
+        "description": "Time process matched watchlist query with <id>"
+      }
+    },
+
+    "binary_search_fields": {
+      "comments": {
+        "type": "text",
+        "default_field": true,
+        "description": "Comment string from FileVersionInfo"
+      },
+      "company_name": {
+        "type": "text",
+        "default_field": true,
+        "description": "Company name from FileVersionInfo"
+      },
+      "copied_mod_len": {
+        "type": "count",
+        "description": "Number of bytes collected"
+      },
+      "digsig_issuer": {
+        "type": "text",
+        "default_field": true,
+        "description": "Digital signature issuer"
+      },
+      "digsig_prog_name": {
+        "type": "text",
+        "default_field": true,
+        "description": "Digital signature program name"
+      },
+      "digsig_publisher": {
+        "type": "text",
+        "default_field": true,
+        "description": "Digital signature publisher"
+      },
+      "digsig_result": {
+        "type": "sign",
+        "default_field": true,
+        "description": "Digital signature result"
+      },
+      "digsig_sign_time": {
+        "type": "datetime",
+        "description": "Digital signature time of signing"
+      },
+      "digsig_subject": {
+        "type": "text",
+        "default_field": true,
+        "description": "Digital signature subject"
+      },
+      "file_desc": {
+        "type": "text",
+        "default_field": true,
+        "description": "File description from FileVersionInfo"
+      },
+      "file_version": {
+        "type": "text",
+        "default_field": true,
+        "description": "File version from FileVersionInfo"
+      },
+      "group": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Sensor group assigned at time of execution"
+      },
+      "host_count": {
+        "type": "integer",
+        "description": "Count of hosts that have seen binary"
+      },
+      "hostname": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Hostname where binary observed"
+      },
+      "internal_name": {
+        "type": "text",
+        "default_field": true,
+        "description": "Internal name from FileVersionInfo"
+      },
+      "is_64bit": {
+        "type": "bool",
+        "description": "True if architecture is x64"
+      },
+      "is_executable_image": {
+        "type": "bool",
+        "description": "True if binary is EXE (versus DLL or SYS)"
+      },
+      "legal_copyright": {
+        "type": "text",
+        "default_field": true,
+        "description": "Legal copyright from FileVersionInfo"
+      },
+      "legal_trademark": {
+        "type": "text",
+        "default_field": true,
+        "description": "Legal trademark from FileVersionInfo"
+      },
+      "md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 hash of binary"
+      },
+      "sha256": {
+        "type": "sha256",
+        "default_field": true,
+        "description": "SHA-256 hash of binary"
+      },
+      "observed_filename": {
+        "type": "path",
+        "default_field": true,
+        "description": "Full path of binary at time of collection"
+      },
+      "orig_mod_len": {
+        "type": "count",
+        "description": "Size in bytes at time of collection"
+      },
+      "original_filename": {
+        "type": "text",
+        "default_field": true,
+        "description": "Original filename from FileVersionInfo"
+      },
+      "os_type": {
+        "type": "keyword",
+        "description": "Type of operating system",
+        "values": ["Windows", "OSX", "Linux"]
+      },
+      "private_build": {
+        "type": "text",
+        "default_field": true,
+        "description": "Private build from FileVersionInfo"
+      },
+      "product_desc": {
+        "type": "text",
+        "default_field": true,
+        "description": "Product description from FileVersionInfo"
+      },
+      "product_name": {
+        "type": "text",
+        "default_field": true,
+        "description": "Product name from FileVersionInfo"
+      },
+      "product_version": {
+        "type": "text",
+        "default_field": true,
+        "description": "Product version from FileVersionInfo"
+      },
+      "server_added_timestamp": {
+        "type": "datetime",
+        "description": "Time binary first seen by server"
+      },
+      "special_build": {
+        "type": "text",
+        "default_field": true,
+        "description": "Special build from FileVersionInfo"
+      },
+      "tampered": {
+        "type": "bool",
+        "description": "True if attempts made to modify sensor binaries/artifacts/config"
+      },
+      "watchlist_<id>": {
+        "type": "datetime",
+        "description": "Time binary matched watchlist query with <id>"
+      }
+    },
+
+    "alert_search_fields": {
+      "alert_severity": {
+        "type": "float",
+        "description": "Overall score of alert (combines report score, feed rating, sensor criticality)"
+      },
+      "alert_type": {
+        "type": "keyword",
+        "description": "Type of alert",
+        "values": [
+          "watchlist.hit.ingress.binary",
+          "watchlist.hit.ingress.process",
+          "watchlist.hit.query.process",
+          "watchlist.hit.query.binary",
+          "watchlist.hit.ingress.host"
+        ]
+      },
+      "assigned_to": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Name of admin who changed alert status"
+      },
+      "create_time": {
+        "type": "datetime",
+        "description": "Date and time feed report created"
+      },
+      "created_time": {
+        "type": "datetime",
+        "description": "Creation time of alert"
+      },
+      "description": {
+        "type": "text",
+        "default_field": true,
+        "description": "Description of feed report"
+      },
+      "domain": {
+        "type": "domain",
+        "default_field": true,
+        "description": "Domain IOC value in feed report"
+      },
+      "feed_category": {
+        "type": "text",
+        "default_field": true,
+        "description": "Category of report/feed"
+      },
+      "feed_id": {
+        "type": "int",
+        "description": "Numeric feed id (-1 for watchlists)"
+      },
+      "feed_name": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Name of feed that triggered alert"
+      },
+      "group": {
+        "type": "keyword",
+        "description": "Sensor group name of endpoint"
+      },
+      "hostname": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Hostname of endpoint"
+      },
+      "ioc_value": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Value of IOC that caused alert"
+      },
+      "ipaddr": {
+        "type": "ipaddr",
+        "description": "IP address IOC value in feed report"
+      },
+      "ipv6addr": {
+        "type": "ipv6addr",
+        "description": "IPv6 address IOC value in feed report"
+      },
+      "is_ignored": {
+        "type": "bool",
+        "description": "Whether report marked to be ignored"
+      },
+      "md5": {
+        "type": "md5",
+        "default_field": true,
+        "description": "MD5 of process that triggered alert or MD5 IOC"
+      },
+      "observed_filename": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Full path of process that triggered alert"
+      },
+      "process_name": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Filename of process that triggered alert"
+      },
+      "process_path": {
+        "type": "path",
+        "default_field": true,
+        "description": "Full path to executable backing process"
+      },
+      "report_id": {
+        "type": "keyword",
+        "description": "Name or unique identifier of threat report"
+      },
+      "report_score": {
+        "type": "float",
+        "description": "Report score of feed that triggered alert"
+      },
+      "resolved_time": {
+        "type": "datetime",
+        "description": "Time alert triaged by resolution action"
+      },
+      "sha256": {
+        "type": "sha256",
+        "default_field": true,
+        "description": "SHA-256 of process that triggered alert or SHA-256 IOC"
+      },
+      "status": {
+        "type": "keyword",
+        "description": "Status of alert",
+        "values": ["resolved", "unresolved", "in progress", "false positive"]
+      },
+      "tags": {
+        "type": "text",
+        "default_field": true,
+        "description": "Tags related to report/feed"
+      },
+      "title": {
+        "type": "text",
+        "description": "Text title of feed report"
+      },
+      "update_time": {
+        "type": "datetime",
+        "description": "Date and time feed report last updated"
+      },
+      "username": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Username context of process that triggered alert"
+      },
+      "watchlist_id": {
+        "type": "int",
+        "default_field": true,
+        "description": "Numeric watchlist id"
+      },
+      "watchlist_name": {
+        "type": "keyword",
+        "default_field": true,
+        "description": "Name of watchlist or report"
+      }
+    },
+
+    "binary_joins": {
+      "description": "Binary search fields used in process searches with suffixes",
+      "suffixes": {
+        "filewrite": "Search binaries written by process",
+        "parent": "Search parent process binaries",
+        "child": "Search child process binaries",
+        "modload": "Search loaded module binaries"
+      },
+      "syntax": "<binary_field>_<suffix>",
+      "examples": [
+        "digsig_result_modload:Unsigned",
+        "company_name_child:Microsoft",
+        "is_executable_image_filewrite:True"
+      ]
+    },
+
+    "bulk_search": {
+      "description": "Search with multiple IOCs using newline-separated list",
+      "requirements": [
+        "Each term on its own line",
+        "No punctuation required or allowed",
+        "Must use 'ipaddr:' prefix for IP addresses",
+        "Prefixes optional but more efficient for other types"
+      ],
+      "example": "md5:hash1\nmd5:hash2\nmd5:hash3"
+    },
+
+    "example_queries": {
+      "process_search": [
+        {
+          "description": "Find processes with network connections to specific domain",
+          "query": "domain:www.carbonblack.com"
+        },
+        {
+          "description": "Find processes that loaded specific DLL",
+          "query": "modload:kernel32.dll"
+        },
+        {
+          "description": "Find processes with specific parent",
+          "query": "parent_name:explorer.exe"
+        },
+        {
+          "description": "Find processes that created child process",
+          "query": "childproc_name:cmd.exe"
+        },
+        {
+          "description": "Find processes by MD5 hash",
+          "query": "md5:5a18f00ab9330ac7539675f3f326cf11"
+        },
+        {
+          "description": "Find processes with command line containing specific term",
+          "query": "cmdline:backup"
+        },
+        {
+          "description": "Find processes on specific hostname",
+          "query": "hostname:win-5ikqdnf9go1"
+        },
+        {
+          "description": "Find processes in sensor group",
+          "query": "group:\"default group\""
+        },
+        {
+          "description": "Find processes by username",
+          "query": "username:system"
+        },
+        {
+          "description": "Find processes with registry modifications",
+          "query": "regmod:registry\\machine\\system\\currentcontrolset\\control\\deviceclasses*"
+        },
+        {
+          "description": "Find processes with network connections to IP address",
+          "query": "ipaddr:127.0.0.1"
+        },
+        {
+          "description": "Find processes with connections to IP subnet",
+          "query": "ipaddr:192.168.1.0/24"
+        },
+        {
+          "description": "Find processes with IPv6 connections",
+          "query": "ipv6addr:fe00:b9:266:2011:28dc:43d4:3298:12e2"
+        },
+        {
+          "description": "Find processes with specific module load count",
+          "query": "modload_count:34"
+        },
+        {
+          "description": "Find processes with module load count in range",
+          "query": "modload_count:[1 TO 10]"
+        },
+        {
+          "description": "Find processes started on specific date",
+          "query": "start:2016-12-01"
+        },
+        {
+          "description": "Find processes started in date range",
+          "query": "start:[2016-12-01 TO 2016-12-31]"
+        },
+        {
+          "description": "Find processes started in last 24 hours",
+          "query": "start:-24h"
+        },
+        {
+          "description": "Find processes with file modifications",
+          "query": "filemod:system32/ntdll.dll"
+        },
+        {
+          "description": "Find processes with cross-process injection",
+          "query": "crossproc_type:remotethread"
+        },
+        {
+          "description": "Complex query with multiple conditions",
+          "query": "(svchost.exe or cmd.exe) and domain:.com and -username:system"
+        },
+        {
+          "description": "Find processes with specific path using wildcards",
+          "query": "path:c:\\windows\\system*\\*.exe"
+        }
+      ],
+      "binary_search": [
+        {
+          "description": "Find binaries by MD5",
+          "query": "md5:5a18f00ab9330ac7539675f3326cf11"
+        },
+        {
+          "description": "Find unsigned binaries",
+          "query": "digsig_result:Unsigned"
+        },
+        {
+          "description": "Find binaries by publisher",
+          "query": "digsig_publisher:Oracle"
+        },
+        {
+          "description": "Find binaries by company name",
+          "query": "company_name:Microsoft"
+        },
+        {
+          "description": "Find binaries by product name",
+          "query": "product_name:Java"
+        },
+        {
+          "description": "Find binaries with expired signatures",
+          "query": "digsig_result:Expired"
+        },
+        {
+          "description": "Find binaries signed on specific date",
+          "query": "digsig_sign_time:2011-12-31"
+        },
+        {
+          "description": "Find 64-bit executables",
+          "query": "is_64bit:true and is_executable_image:true"
+        },
+        {
+          "description": "Find binaries observed at specific path",
+          "query": "observed_filename:c:\\windows\\system32\\mtxoci.dll"
+        },
+        {
+          "description": "Find binaries with specific size range",
+          "query": "orig_mod_len:[1024 TO 4096]"
+        }
+      ],
+      "alert_search": [
+        {
+          "description": "Find unresolved alerts",
+          "query": "status:unresolved"
+        },
+        {
+          "description": "Find alerts from specific feed",
+          "query": "feed_name:\"My Watchlists\""
+        },
+        {
+          "description": "Find alerts on specific hostname",
+          "query": "hostname:workstation01"
+        },
+        {
+          "description": "Find alerts by severity score",
+          "query": "alert_severity:[75 TO *]"
+        },
+        {
+          "description": "Find alerts assigned to specific user",
+          "query": "assigned_to:john.doe"
+        },
+        {
+          "description": "Find alerts with specific IOC",
+          "query": "ioc_value:5a18f00ab9330ac7539675f3326cf11"
+        }
+      ],
+      "threat_intelligence": [
+        {
+          "description": "Find binaries with any threat intelligence score",
+          "query": "alliance_score_<feed>:*"
+        },
+        {
+          "description": "Find binaries with specific feed score",
+          "query": "alliance_score_<feed>:10"
+        },
+        {
+          "description": "Find binaries with feed score in range",
+          "query": "alliance_score_<feed>:[10 TO 20]"
+        },
+        {
+          "description": "Find binaries with high threat score",
+          "query": "alliance_score_<feed>:[75 TO *]"
+        }
+      ],
+      "binary_joins": [
+        {
+          "description": "Find processes that loaded unsigned modules",
+          "query": "digsig_result_modload:Unsigned"
+        },
+        {
+          "description": "Find processes with unsigned parent",
+          "query": "digsig_result_parent:Unsigned"
+        },
+        {
+          "description": "Find processes that wrote unsigned files",
+          "query": "digsig_result_filewrite:Unsigned"
+        },
+        {
+          "description": "Find processes with unsigned child processes",
+          "query": "digsig_result_child:Unsigned"
+        }
+      ],
+      "complex_queries": [
+        {
+          "description": "Find suspicious PowerShell with network activity",
+          "query": "process_name:powershell.exe and netconn_count:[1 TO *] and -domain:.microsoft.com"
+        },
+        {
+          "description": "Find processes with suspicious behaviors",
+          "query": "(crossproc_type:remotethread or crossproc_type:processopen) and -signed:true"
+        },
+        {
+          "description": "Find lateral movement indicators",
+          "query": "parent_name:services.exe and process_name:cmd.exe and netconn_count:[1 TO *]"
+        },
+        {
+          "description": "Find persistence via registry",
+          "query": "regmod:*\\currentversion\\run* and filewrite_md5:*"
+        },
+        {
+          "description": "Find encoded command execution",
+          "query": "cmdline:*-enc* or cmdline:*-encodedcommand* or cmdline:*frombase64*"
+        }
+      ]
+    },
+
+    "best_practices": {
+      "performance": [
+        "Avoid leading wildcards - they carry significant performance penalty",
+        "Use specific fields instead of searching all default fields",
+        "Use binary joins sparingly as they can be resource-intensive",
+        "Prefer exact matches over wildcards when possible",
+        "Use date ranges to limit search scope"
+      ],
+      "query_construction": [
+        "Multiple terms without operators are connected with AND by default",
+        "Terms not preceded by fields search all default fields",
+        "Use quotes for terms with whitespace",
+        "Escape special characters with backslash when needed",
+        "Use parentheses for complex nested queries"
+      ],
+      "special_considerations": [
+        "For regmod searches: replace controlset001/002 with currentcontrolset",
+        "For regmod searches: omit leading backslash",
+        "For modload searches: omit leading slash (optional but recommended)",
+        "For IP addresses in bulk search: must use 'ipaddr:' prefix",
+        "For domain searches: dot placement affects position matching"
+      ]
+    },
+
+    "query_building_guidelines": {
+      "step_1_identify_intent": {
+        "description": "Determine what the user is trying to find",
+        "questions": [
+          "What type of entity? (process, binary, alert, threat report)",
+          "What attributes are being searched?",
+          "What relationships are important? (parent/child, file modifications, network connections)",
+          "What time range is relevant?"
+        ]
+      },
+      "step_2_select_fields": {
+        "description": "Choose appropriate fields based on search intent",
+        "considerations": [
+          "Use specific fields (process_md5) over general fields (md5) when possible",
+          "Consider default fields for broader searches",
+          "Use binary join suffixes when searching binary attributes in process search",
+          "Match field types to search values (datetime, count ranges, etc.)"
+        ]
+      },
+      "step_3_construct_query": {
+        "description": "Build the query string with proper syntax",
+        "rules": [
+          "Combine multiple conditions with AND, OR, NOT operators",
+          "Use parentheses for grouping complex conditions",
+          "Quote terms with whitespace or special characters",
+          "Apply wildcards only when necessary",
+          "Format values according to field type (CIDR for IP, ISO for dates, etc.)"
+        ]
+      },
+      "step_4_validate_syntax": {
+        "description": "Check query syntax for correctness",
+        "validations": [
+          "All parentheses are balanced",
+          "Field names are spelled correctly",
+          "Value formats match field types",
+          "Special characters are properly escaped",
+          "Wildcards are not leading unless absolutely necessary"
+        ]
+      }
+    },
+
+    "common_use_cases": {
+      "malware_detection": {
+        "description": "Detecting malware execution and behavior",
+        "example_queries": [
+          "digsig_result:Unsigned and netconn_count:[1 TO *]",
+          "process_name:*.tmp.exe or process_name:*.dat.exe",
+          "crossproc_type:remotethread and -parent_name:explorer.exe"
+        ]
+      },
+      "lateral_movement": {
+        "description": "Detecting lateral movement across network",
+        "example_queries": [
+          "process_name:psexec.exe or process_name:wmic.exe",
+          "parent_name:services.exe and netconn_count:[1 TO *]",
+          "cmdline:*\\\\C$\\* or cmdline:*\\\\ADMIN$\\*"
+        ]
+      },
+      "persistence": {
+        "description": "Detecting persistence mechanisms",
+        "example_queries": [
+          "regmod:*\\run* or regmod:*\\runonce*",
+          "filemod:*\\startup\\*.exe",
+          "cmdline:*schtasks* and cmdline:*/create*"
+        ]
+      },
+      "data_exfiltration": {
+        "description": "Detecting potential data exfiltration",
+        "example_queries": [
+          "netconn_count:[100 TO *] and ipport:443",
+          "process_name:curl.exe or process_name:wget.exe",
+          "cmdline:*compress* or cmdline:*zip* or cmdline:*rar*"
+        ]
+      },
+      "credential_access": {
+        "description": "Detecting credential dumping and access",
+        "example_queries": [
+          "process_name:mimikatz.exe or cmdline:*sekurlsa*",
+          "regmod:*\\sam or regmod:*\\system or regmod:*\\security",
+          "modload:*samlib.dll and -process_name:lsass.exe"
+        ]
+      },
+      "privilege_escalation": {
+        "description": "Detecting privilege escalation attempts",
+        "example_queries": [
+          "cmdline:*runas* or cmdline:*elevate*",
+          "crossproc_type:processopen and crossproc_name:lsass.exe",
+          "filemod:*\\system32\\* and username:SYSTEM"
+        ]
+      }
+    },
+
+    "troubleshooting": {
+      "no_results": [
+        "Check if wildcards are leading (not recommended)",
+        "Verify field names are correct and applicable to search type",
+        "Ensure value format matches field type",
+        "Check if date ranges are valid and not too restrictive",
+        "Verify special characters are properly escaped"
+      ],
+      "too_many_results": [
+        "Add more specific field constraints",
+        "Narrow date ranges",
+        "Use exact matches instead of wildcards",
+        "Add NOT operators to exclude known good processes",
+        "Combine multiple conditions with AND"
+      ],
+      "syntax_errors": [
+        "Check for unbalanced parentheses",
+        "Verify quotes are properly closed",
+        "Ensure colons separate fields and values",
+        "Check for unsupported characters",
+        "Validate operator spelling (and, or, not)"
+      ],
+      "performance_issues": [
+        "Remove leading wildcards",
+        "Reduce scope with date ranges",
+        "Use specific fields instead of general searches",
+        "Avoid complex binary joins when possible",
+        "Break complex queries into simpler sub-queries"
+      ]
+    },
+
+    "api_integration_notes": {
+      "description": "Notes for integrating with CarbonBlack Cloud API",
+      "considerations": [
+        "API may have rate limits - implement throttling",
+        "Some fields may require specific API permissions",
+        "Query length may be limited - break into multiple queries if needed",
+        "Results are paginated - implement proper pagination logic",
+        "Some searches may be asynchronous - poll for results",
+        "Validate queries client-side before sending to API"
+      ]
+    }
+  }
+}
