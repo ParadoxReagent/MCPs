@@ -38,7 +38,7 @@ try:  # pragma: no cover - import guard
 except ImportError:  # pragma: no cover - handled at runtime
     rapidfuzz_process = None  # type: ignore[assignment]
 
-from schema_loader import CBCSchemaCache
+from .schema_loader import CBCSchemaCache
 
 logger = logging.getLogger(__name__)
 

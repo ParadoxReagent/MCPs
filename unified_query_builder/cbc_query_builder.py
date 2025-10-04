@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
-from .schema_loader import normalise_search_type
+from .cbc_schema_loader import normalise_search_type
 
 
 DEFAULT_SEARCH_TYPE = "process_search"

@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  unified-mcp:
+    platform: linux/arm64
+    build: .
+    image: unified-query-builder:latest
+    container_name: unified-query-builder
+    user: "10001:10001"
+    working_dir: /app
+    environment:
+      - CACHE_DIR=/app/.cache
+    volumes:
+      - type: volume
+        source: unified_query_builder_cache
+        target: /app/.cache
+        consistency: delegated
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "test", "-w", "/app/.cache"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  unified_query_builder_cache: {}
